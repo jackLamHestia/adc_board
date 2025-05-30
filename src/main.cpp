@@ -16,6 +16,16 @@
 #define ADC_ADDRESS 0x48
 #define ADC_I2C_ADDR_SELECT_PIN 25
 
+// LED related constants
+#define LED_PIN 25
+#define LED_BLINK_DELAY_MS 1000
+
+// ADC command constants
+#define ADC_CMD_START 0x01
+#define ADC_CMD_CHANNEL_MASK 0xC1
+#define ADC_CMD_END 0x83
+#define ADC_REG_POINTER 0x00
+
 // Function to scan I2C bus and check for device
 static bool check_i2c_device(uint16_t address)
 {
@@ -60,6 +70,7 @@ TaskHandle_t led_blink_loop_handle = NULL;
 
 static void cmd_read_adc(EmbeddedCli *cli, char *args, void *context)
 {
+    (void)context;  // Cast unused parameter to void
     int16_t tokenCount = embeddedCliGetTokenCount(args);
     uint8_t channel = 0;
     if (tokenCount != 1)
@@ -72,7 +83,7 @@ static void cmd_read_adc(EmbeddedCli *cli, char *args, void *context)
         channel = atoi(embeddedCliGetToken(args, 1));
     }
 
-    uint8_t cmd[3] = {0x01, 0xC1 | (channel << 4), 0x83};
+    uint8_t cmd[3] = {ADC_CMD_START, ADC_CMD_CHANNEL_MASK | (channel << 4), ADC_CMD_END};
     int msg;
     uint8_t data[2];
 
@@ -81,7 +92,7 @@ static void cmd_read_adc(EmbeddedCli *cli, char *args, void *context)
     Serial.printf("Command bytes: 0x%02X 0x%02X 0x%02X\n", cmd[0], cmd[1], cmd[2]);
 
     // Increased timeout to 1000000μs (1s)
-    msg = i2c_write_blocking(ADC_PORT, 0x48, cmd, 3, false);
+    msg = i2c_write_blocking(ADC_PORT, ADC_ADDRESS, cmd, 3, false);
     Serial.printf("msg: %d\n", msg);
     if (msg == PICO_ERROR_GENERIC)
     {
@@ -101,8 +112,7 @@ static void cmd_read_adc(EmbeddedCli *cli, char *args, void *context)
     sleep_ms(10);
 
     // Write pointer register to read the conversion result
-    uint8_t reg = 0x00;
-    msg = i2c_write_blocking(ADC_PORT, ADC_ADDRESS, &reg, 1, false);
+    msg = i2c_write_blocking(ADC_PORT, ADC_REG_POINTER, &cmd[0], 1, false);
     if (!msg)
     {
         return;
@@ -115,10 +125,6 @@ static void cmd_read_adc(EmbeddedCli *cli, char *args, void *context)
     }
 
     int16_t result = (int16_t)(data[0] << 8 | data[1]);
-    for (int i = 0; i < 3; i++)
-    {
-        Serial.printf("data[%d]: %d\n", i, data[i]);
-    }
     float voltage = (float)result;
     Serial.printf("Voltage Result: %d\n", voltage);
 }
@@ -128,15 +134,15 @@ static void cmd_write_char(EmbeddedCli *embeddedCli, char c)
     Serial.write(c);
 }
 
-void led_blink_thread(void *pvPramaters)
+static void led_blink_thread(void *pvParameters)  // Fixed typo in parameter name
 {
-    (void)pvPramaters;
+    (void)pvParameters;
     for (;;)
     {
-        digitalWrite(25, HIGH);
-        delay(1000);
-        digitalWrite(25, LOW);
-        delay(1000);
+        digitalWrite(LED_PIN, HIGH);
+        delay(LED_BLINK_DELAY_MS);
+        digitalWrite(LED_PIN, LOW);
+        delay(LED_BLINK_DELAY_MS);
     }
 }
 
@@ -191,11 +197,11 @@ void loop()
     // delay(1000);
 }
 
-void setup1()
+void setup1(void)  // Added void parameter
 {
-    pinMode(25, OUTPUT);
+    pinMode(LED_PIN, OUTPUT);
 }
 
-void loop1()
+void loop1(void)  // Added void parameter
 {
 }
